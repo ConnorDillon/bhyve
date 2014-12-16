@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 from setuptools import setup
 
-setup(name='cmdtool',
+setup(name='bhyve',
       version='0.1',
       description='A tool for managing bhyve VM\'s, '
                   'because libvirt doesn\'t do want I want it to',

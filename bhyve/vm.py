@@ -19,33 +19,47 @@ class VM:
             '-c ' + str(self.cpus),
             '-m ' + self.memsize,
             '-l com1,' + self.nmdm,
-            '-s 0:0,hostbridge',
-            '-s 1:0,lpc'
+            '-s 0,hostbridge',
+            '-s 1,lpc'
         ]
         for idx, item in enumerate(self.disks + self.nics):
-            options.append(item.as_option(idx+2))
-        return list(flatmap(lambda x: x.create(), self.nics)) + ['bhyve {0} {1}'.format(' '.join(options), self.name)]
+            options.append(item.as_option(idx + 2))
+
+        return list(flatmap(lambda x: x.create(), self.nics)) + [
+            'echo "{devmap}" > /tmp/{name}-device.map'.format(**self.__dict__),
+            'grub-bhyve -m /tmp/{name}-device.map -d {grubdir}'
+            ' -r {bootpart} -M {memsize} {name}'.format(**self.__dict__),
+            'rm /tmp/{name}-device.map'.format(**self.__dict__),
+            'bhyve {0} {1}'.format(' '.join(options), self.name)
+        ]
+
+    def destroy(self):
+        return ['bhyvectl --destroy --vm='+self.name] + list(map(lambda x: x.destroy(), self.nics))
 
 
 class NIC:
-    def __init__(self, name, bridge):
+    def __init__(self, name, bridge=None):
         self.name = name
         self.bridge = bridge
 
     def create(self):
+        assert self.bridge
         return ['ifconfig {} create'.format(self.name),
                 'ifconfig {0} addm {1}'.format(self.bridge, self.name)]
 
+    def destroy(self):
+        return 'ifconfig {} destroy'.format(self.name)
+
     def as_option(self, slot):
-        return '-s {0}:0,virtio-net,{1}'.format(slot, self.name)
+        return '-s {0},virtio-net,{1}'.format(slot, self.name)
 
 
 class Disk:
-    def __init__(self, pool, name, size=None):
+    def __init__(self, name, pool, size=None):
         self.name = name
         self.pool = pool
         self.size = size
         self.zvol = '/dev/zvol/{0}/{1}'.format(self.pool, self.name)
 
     def as_option(self, slot):
-        return '-s {0}:0,virtio-blk,{1}'.format(slot, self.zvol)
+        return '-s {0},virtio-blk,{1}'.format(slot, self.zvol)
