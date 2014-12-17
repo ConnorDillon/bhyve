@@ -1,4 +1,4 @@
-__all__ = ['Bhyve']
+__all__ = ['Bhyvesh']
 
 
-from .bhyve import Bhyve
+from .bhyvesh import Bhyvesh
