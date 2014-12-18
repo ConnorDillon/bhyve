@@ -9,4 +9,7 @@ setup(name='bhyve',
       author_email='connor@cdillon.nl',
       license='GPLv3',
       packages=['bhyve'],
+      install_requires=[
+          'PyYAML',
+      ],
       zip_safe=False)

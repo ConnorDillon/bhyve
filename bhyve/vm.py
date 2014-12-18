@@ -1,26 +1,30 @@
 from morefunctools import flatmap
+from .serializable import Serializable, load_from_key_value
 
 
-class VM:
+class VM(Serializable):
     def __init__(self, name, memsize, cpus, nmdm_id, bootpart, grubdir, nics, disks):
         self.name = name
         self.memsize = memsize
         self.cpus = cpus
-        self.nmdm = '/dev/nmdm{}A'.format(nmdm_id)
+        self.nmdm_id = nmdm_id
+        self.bootpart = bootpart
         self.grubdir = grubdir
         self.nics = nics
         self.disks = disks
+
+        self.nmdm = '/dev/nmdm{}A'.format(self.nmdm_id)
         self.devmap = '(hd0) ' + self.disks[0].zvol
-        self.bootdev = 'hd0,' + bootpart
+        self.bootdev = 'hd0,' + self.bootpart
 
     def create_nics(self):
         return list(flatmap(lambda x: x.create(), self.nics))
 
     def start_bootloader(self):
-        return ['echo "{devmap}" > /tmp/{name}-device.map'.format(**self.__dict__),
+        return ['echo "{devmap}" > /tmp/{name}-device.map'.format(**vars(self)),
                 'grub-bhyve -m /tmp/{name}-device.map -d {grubdir}'
-                ' -r {bootdev} -M {memsize} {name}'.format(**self.__dict__),
-                'rm /tmp/{name}-device.map'.format(**self.__dict__)]
+                ' -r {bootdev} -M {memsize} {name}'.format(**vars(self)),
+                'rm /tmp/{name}-device.map'.format(**vars(self))]
 
     def start_os(self):
         options = [
@@ -43,8 +47,23 @@ class VM:
     def destroy(name):
         return 'bhyvectl --destroy --vm='+name
 
+    def to_dict(self):
+        my_vars = dict(vars(self))
+        del my_vars['nmdm']
+        del my_vars['devmap']
+        del my_vars['bootdev']
+        my_vars['nics'] = list(map(lambda x: x.to_dict(), self.nics))
+        my_vars['disks'] = list(map(lambda x: x.to_dict(), self.disks))
+        return my_vars
 
-class NIC:
+    @classmethod
+    def from_dict(cls, dct):
+        dct['nics'] = list(map(lambda x: NIC.from_dict(x), dct['nics']))
+        dct['disks'] = list(map(lambda x: Disk.from_dict(x), dct['disks']))
+        return super().from_dict(dct)
+
+
+class NIC(Serializable):
     def __init__(self, name, bridge):
         self.name = name
         self.bridge = bridge
@@ -60,13 +79,27 @@ class NIC:
     def as_option(self, slot):
         return '-s {0},virtio-net,{1}'.format(slot, self.name)
 
+    def to_dict(self):
+        return {self.name: self.bridge}
 
-class Disk:
-    def __init__(self, name, pool, size=None):
+    @classmethod
+    def from_dict(cls, dct):
+        return load_from_key_value(cls, dct)
+
+
+class Disk(Serializable):
+    def __init__(self, name, pool):
         self.name = name
         self.pool = pool
-        self.size = size
+
         self.zvol = '/dev/zvol/{0}/{1}'.format(self.pool, self.name)
 
     def as_option(self, slot):
         return '-s {0},virtio-blk,{1}'.format(slot, self.zvol)
+
+    def to_dict(self):
+        return {self.name: self.pool}
+
+    @classmethod
+    def from_dict(cls, dct):
+        return load_from_key_value(cls, dct)
