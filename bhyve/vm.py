@@ -1,4 +1,3 @@
-from morefunctools import flatmap
 from .serializable import Serializable, load_from_key_value
 
 
@@ -43,8 +42,11 @@ class VM(Serializable):
     def create(self):
         return self.create_nics() + self.start_bootloader() + [self.start_os()]
 
+    def destroy(self):
+        return ['bhyvectl --destroy --vm='+self.name] + list(map(lambda x: x.destroy(), self.nics))
+
     @staticmethod
-    def destroy(name):
+    def destroy_once(name):
         return 'bhyvectl --destroy --vm='+name
 
     def to_dict(self):
@@ -72,8 +74,11 @@ class NIC(Serializable):
         return ['ifconfig {} create'.format(self.name),
                 'ifconfig {0} addm {1}'.format(self.bridge, self.name)]
 
+    def destroy(self):
+        return 'ifconfig {} destroy'.format(self.name)
+
     @staticmethod
-    def destroy(name):
+    def destroy_once(name):
         return 'ifconfig {} destroy'.format(name)
 
     def as_option(self, slot):
@@ -103,3 +108,7 @@ class Disk(Serializable):
     @classmethod
     def from_dict(cls, dct):
         return load_from_key_value(cls, dct)
+
+
+def flatmap(fn, lst):
+    return (y for x in map(fn, lst) for y in x)

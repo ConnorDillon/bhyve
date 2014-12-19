@@ -1,3 +1,4 @@
+import subprocess
 from .vm import VM, Disk, NIC
 from .config import Config
 from cmdtool import Superscript, Subscript, ToList
@@ -7,41 +8,73 @@ class Bhyvesh(Superscript):
     def __init__(self):
         super().__init__(name='bhyvesh',
                          description='A tool for managing bhyve VM\'s',
-                         subscripts=[Create, Destroy, Start],
+                         subscripts=[CreateOnce, DestroyOnce, Create, Destroy, CreateAll],
                          log_output='syslog',
                          log_format='bhyvesh: %(levelname)s: %(message)s')
 
 
-class Start(Subscript):
-    def __init__(self, superscript):
-        super().__init__('start', superscript)
-        self.add_arg('name')
+class VMOps(Subscript):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.add_arg('-c', '--config', default='/usr/local/etc/bhyve.yaml')
 
-    def script(self):
-        config = Config.open(self.args.config)
-        self.info('starting VM: '+self.args.name)
-        for command in config.get(self.args.name).create():
+    def load_config(self):
+        return Config.open(self.args.config)
+
+    def load_vm(self, name):
+        return self.load_config().get(name)
+
+    def create_vm(self, name):
+        self.info('creating VM: '+name)
+        vm = self.load_vm(name)
+        for command in vm.create_nics() + vm.start_bootloader():
+            self.sh(command)
+        try:
+            self.sh(vm.start_os())
+        except subprocess.CalledProcessError as e:
+            if not e.output.decode() == '' and e.returncode == 1:
+                raise
+            else:
+                self.debug('VM stopped with exception: ' + str(e))
+        finally:
+            self.destroy_vm(name)
+
+    def destroy_vm(self, name):
+        self.info('destroying VM: '+name)
+        for command in self.load_vm(name).destroy():
             self.sh(command)
 
 
-# doesn't work yet, needs threading
-class StartAll(Subscript):
-    def __init__(self, superscript):
-        super().__init__('start_all', superscript)
-        self.add_arg('-c', '--config', default='/usr/local/etc/bhyve.yaml')
-
-    def script(self):
-        config = Config.open(self.args.config)
-        for name, vm in config.vms.items():
-            self.info('starting VM: '+name)
-            for command in vm.create():
-                self.sh(command)
-
-
-class Create(Subscript):
+class Create(VMOps):
     def __init__(self, superscript):
         super().__init__('create', superscript)
+        self.add_arg('name')
+
+    def script(self):
+        self.create_vm(self.args.name)
+
+
+class Destroy(VMOps):
+    def __init__(self, superscript):
+        super().__init__('destroy', superscript)
+        self.add_arg('name')
+
+    def script(self):
+        self.destroy_vm(self.args.name)
+
+
+class CreateAll(VMOps):
+    def __init__(self, superscript):
+        super().__init__('create_all', superscript)
+
+    def script(self):
+        for name in self.load_config().vms.keys():
+            self.run_thread(self.create_vm, name)
+
+
+class CreateOnce(Subscript):
+    def __init__(self, superscript):
+        super().__init__('create_once', superscript)
         self.add_arg('name')
         self.add_arg('nmdm_id', type=int)
         self.add_arg('-c', '--cpus', default=1)
@@ -61,14 +94,14 @@ class Create(Subscript):
             self.sh(command)
 
 
-class Destroy(Subscript):
+class DestroyOnce(Subscript):
     def __init__(self, superscript):
-        super().__init__('destroy', superscript)
+        super().__init__('destroy_once', superscript)
         self.add_arg('name')
         self.add_arg('-n', '--nic', dest='nics', action=ToList)
 
     def script(self):
-        commands = [VM.destroy(self.args.name)]
-        commands.extend(map(lambda x: NIC.destroy(x), self.args.nics))
+        commands = [VM.destroy_once(self.args.name)]
+        commands.extend(map(lambda x: NIC.destroy_once(x), self.args.nics))
         for command in commands:
             self.sh(command)
