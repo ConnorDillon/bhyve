@@ -10,5 +10,5 @@ setup(name='bhyve',
       license='GPLv3',
       packages=['bhyve'],
       scripts=['scripts/bkeep'],
-      install_requires=['PyYAML'],
+      install_requires=['PyYAML', 'cmdtool==0.1'],
       zip_safe=False)
