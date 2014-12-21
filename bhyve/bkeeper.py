@@ -4,7 +4,7 @@ from .config import Config
 from cmdtool import Superscript, Subscript, ToList
 
 
-class Bhyvesh(Superscript):
+class BKeeper(Superscript):
     def __init__(self):
         super().__init__(name='bhyvesh',
                          description='A tool for managing bhyve VM\'s',
