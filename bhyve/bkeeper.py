@@ -87,7 +87,7 @@ class VMCreation(Subscript):
         super().__init__(*args, **kwargs)
         self.add_arg('name')
         self.add_arg('nmdm_id', type=int)
-        self.add_arg('-c', '--cpus', default=1)
+        self.add_arg('-c', '--cpus', type=int, default=1)
         self.add_arg('-m', '--memsize', default='256M')
         self.add_arg('-g', '--grubdir', default='/boot/grub')
         self.add_arg('-b', '--bootpart', default='gpt1')
