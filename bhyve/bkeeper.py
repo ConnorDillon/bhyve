@@ -92,9 +92,9 @@ class VMCreation(Subscript):
         self.add_arg('-g', '--grubdir', default='/boot/grub')
         self.add_arg('-b', '--bootpart', default='gpt1')
         self.add_arg('-n', '--nic', dest='nics', action=ToList, nargs=2, required=True)
+        self.add_arg('-d', '--disk', dest='disks', action=ToList, nargs=2, required=True)
 
     def get_vm(self):
-        assert hasattr(self.args, 'disks')
         vm = {
             'name': self.args.name,
             'nmdm_id': self.args.nmdm_id,
@@ -111,7 +111,6 @@ class VMCreation(Subscript):
 class CreateOnce(VMCreation):
     def __init__(self, superscript):
         super().__init__('create_once', superscript)
-        self.add_arg('-d', '--disk', dest='disks', action=ToList, nargs=2, required=True)
 
     def script(self):
         vm = self.get_vm()
@@ -136,16 +135,12 @@ class DestroyOnce(Subscript):
 class Add(ConfigOps, VMCreation):
     def __init__(self, superscript):
         super().__init__('add', superscript)
-        self.add_arg('-d', '--disk', dest='disks', action=ToList, nargs=3, required=True)
 
     def script(self):
         vm = self.get_vm()
         config = self.load_config()
         config.add(vm)
         self.save(config)
-
-        for disk in vm.disks:
-            self.sh(disk.create())
 
 
 class Remove(VMOps):
