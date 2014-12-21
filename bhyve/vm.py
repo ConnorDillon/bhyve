@@ -93,11 +93,19 @@ class NIC(Serializable):
 
 
 class Disk(Serializable):
-    def __init__(self, name, pool):
+    def __init__(self, name, pool, size=None):
         self.name = name
         self.pool = pool
+        self.size = size
 
         self.zvol = '/dev/zvol/{0}/{1}'.format(self.pool, self.name)
+
+    def create(self):
+        assert self.size
+        return 'zfs create -V {size} {pool}/{name}'.format(**vars(self))
+
+    def destroy(self):
+        return 'zfs destroy {pool}/{name}'.format(**vars(self))
 
     def as_option(self, slot):
         return '-s {0},virtio-blk,{1}'.format(slot, self.zvol)

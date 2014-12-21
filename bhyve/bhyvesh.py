@@ -8,18 +8,28 @@ class Bhyvesh(Superscript):
     def __init__(self):
         super().__init__(name='bhyvesh',
                          description='A tool for managing bhyve VM\'s',
-                         subscripts=[CreateOnce, DestroyOnce, Create, Destroy, CreateAll],
-                         log_output='syslog',
+                         subscripts=[CreateOnce, DestroyOnce, Create, Destroy, CreateAll, Add, Remove],
+                         log_output='console',
+                         # log_output='syslog',
                          log_format='bhyvesh: %(levelname)s: %(message)s')
 
 
-class VMOps(Subscript):
+class ConfigOps(Subscript):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.add_arg('-c', '--config', default='/usr/local/etc/bhyve.yaml')
+        self.add_arg('--config', default='/usr/local/etc/bhyve.yaml')
 
     def load_config(self):
         return Config.open(self.args.config)
+
+    def save(self, config):
+        if not self.testmode:
+            config.save()
+        else:
+            self.debug(config.dump())
+
+
+class VMOps(ConfigOps):
 
     def load_vm(self, name):
         return self.load_config().get(name)
@@ -72,25 +82,41 @@ class CreateAll(VMOps):
             self.run_thread(self.create_vm, name)
 
 
-class CreateOnce(Subscript):
-    def __init__(self, superscript):
-        super().__init__('create_once', superscript)
+class VMCreation(Subscript):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.add_arg('name')
         self.add_arg('nmdm_id', type=int)
         self.add_arg('-c', '--cpus', default=1)
         self.add_arg('-m', '--memsize', default='256M')
         self.add_arg('-g', '--grubdir', default='/boot/grub')
         self.add_arg('-b', '--bootpart', default='gpt1')
-        self.add_arg('-d', '--disk', dest='disks', action=ToList, nargs=2, required=True)
         self.add_arg('-n', '--nic', dest='nics', action=ToList, nargs=2, required=True)
 
+    def get_vm(self):
+        assert hasattr(self.args, 'disks')
+        vm = {
+            'name': self.args.name,
+            'nmdm_id': self.args.nmdm_id,
+            'cpus': self.args.cpus,
+            'memsize': self.args.memsize,
+            'grubdir': self.args.grubdir,
+            'bootpart': self.args.bootpart,
+            'nics': list(map(lambda x: NIC(*x), self.args.nics)),
+            'disks': list(map(lambda x: Disk(*x), self.args.disks))
+        }
+        return VM(**vm)
+
+
+class CreateOnce(VMCreation):
+    def __init__(self, superscript):
+        super().__init__('create_once', superscript)
+        self.add_arg('-d', '--disk', dest='disks', action=ToList, nargs=2, required=True)
+
     def script(self):
-        self.params['disks'] = list(map(lambda x: Disk(*x), self.args.disks))
-        self.params['nics'] = list(map(lambda x: NIC(*x), self.args.nics))
-        params = self.params
-        params.pop('command')
-        self.info('creating VM: '+self.args.name)
-        for command in VM(**params).create():
+        vm = self.get_vm()
+        self.info('creating VM: '+vm.name)
+        for command in vm.create():
             self.sh(command)
 
 
@@ -105,3 +131,35 @@ class DestroyOnce(Subscript):
         commands.extend(map(lambda x: NIC.destroy_once(x), self.args.nics))
         for command in commands:
             self.sh(command)
+
+
+class Add(ConfigOps, VMCreation):
+    def __init__(self, superscript):
+        super().__init__('add', superscript)
+        self.add_arg('-d', '--disk', dest='disks', action=ToList, nargs=3, required=True)
+
+    def script(self):
+        vm = self.get_vm()
+        config = self.load_config()
+        config.add(vm)
+        self.save(config)
+
+        for disk in vm.disks:
+            self.sh(disk.create())
+
+
+class Remove(VMOps):
+    def __init__(self, superscript):
+        super().__init__('remove', superscript)
+        self.add_arg('name')
+        self.add_arg('--erase', action='store_true')
+
+    def script(self):
+        config = self.load_config()
+        config.remove(self.args.name)
+        self.save(config)
+
+        if self.args.erase:
+            vm = self.load_vm(self.args.name)
+            for disk in vm.disks:
+                self.sh(disk.destroy())
