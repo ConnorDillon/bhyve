@@ -38,9 +38,9 @@ class TestBKeeper(TestCase):
         self.vm_vol = self.vm_name + '-root'
         self.vm_vol2 = self.vm_name + '-data'
         self.vm_zpool = 'vmpool1'
-        self.create_str = ('{vm_name} {vm_nmdmid} -c {vm_cpus} -m {vm_memsize} -g {vm_bootdir} -b {vm_bootpart}'
-                           ' -n {vm_nic} {vm_bridge} -n {vm_nic2} {vm_bridge} -d {vm_vol} {vm_zpool}'
-                           ' -d {vm_vol2} {vm_zpool}').format(**vars(self))
+        self.create_str = self.fmt('{vm_name} {vm_nmdmid} -c {vm_cpus} -m {vm_memsize} -g {vm_bootdir} -b {vm_bootpart}'
+                                   ' -n {vm_nic} {vm_bridge} -n {vm_nic2} {vm_bridge} -d {vm_vol} {vm_zpool}'
+                                   ' -d {vm_vol2} {vm_zpool}')
 
         self.create_expected = [
             'ifconfig {vm_nic} create',
@@ -85,41 +85,29 @@ class TestBKeeper(TestCase):
         self.verify_destroy(log)
 
     def test_add(self):
-        bkeep = BKeeper()
-        bkeep.parse_args(self.fmt('add {create_str} --config {config} --console'))
-        bkeep()
+        BKeeper()(self.fmt('add {create_str} --config {config} --console'))
 
     def test_create(self):
-        bkeep = BKeeper()
-        bkeep.parse_args(self.fmt('create {vm_name} --testmode --config {config} --console'))
         with TestLog() as log:
-            bkeep()
+            BKeeper()(self.fmt('create {vm_name} --testmode --config {config} --console'))
         self.verify(log)
 
     def test_destroy(self):
-        bkeep = BKeeper()
-        bkeep.parse_args(self.fmt('destroy {vm_name} --testmode --config {config} --console'))
         with TestLog() as log:
-            bkeep()
+            BKeeper()(self.fmt('destroy {vm_name} --testmode --config {config} --console'))
         self.verify_destroy(log)
 
     def test_create_once(self):
-        bkeep = BKeeper()
-        bkeep.parse_args(self.fmt('create_once {create_str} --testmode --console'))
         with TestLog() as log:
-            bkeep()
+            BKeeper()(self.fmt('create_once {create_str} --testmode --console'))
         self.verify_create(log)
 
     def test_destroy_once(self):
-        bkeep = BKeeper()
-        bkeep.parse_args(self.fmt('destroy_once {vm_name} -n {vm_nic} -n {vm_nic2} --testmode --console'))
         with TestLog() as log:
-            bkeep()
+            BKeeper()(self.fmt('destroy_once {vm_name} -n {vm_nic} -n {vm_nic2} --testmode --console'))
         self.verify_destroy(log)
 
     def test_remove(self):
-        bkeep = BKeeper()
-        bkeep.parse_args(self.fmt('remove {vm_name} --config {config} --console'))
-        bkeep()
+        BKeeper()(self.fmt('remove {vm_name} --config {config} --console'))
         with open(self.config) as cfg:
             self.assertEqual(cfg.read(), '{}\n')
