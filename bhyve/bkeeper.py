@@ -1,20 +1,18 @@
 import subprocess
 from .vm import VM, Disk, NIC
 from .config import Config
-from cmdtool import Superscript, Subscript, ToList
+from cmdtool import SuperCommand, SubCommand, ToList
 
 
-class BKeeper(Superscript):
+class BKeeper(SuperCommand):
     def __init__(self):
-        super().__init__(name='bhyvesh',
+        super().__init__(name='bkeeper',
                          description='A tool for managing bhyve VM\'s',
                          subscripts=[CreateOnce, DestroyOnce, Create, Destroy, CreateAll, Add, Remove],
-                         log_output='console',
-                         # log_output='syslog',
-                         log_format='bhyvesh: %(levelname)s: %(message)s')
+                         log_fmt='bkeeper: %(levelname)s: %(message)s')
 
 
-class ConfigOps(Subscript):
+class ConfigOps(SubCommand):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.add_arg('--config', default='/usr/local/etc/bhyve.yaml')
@@ -82,7 +80,7 @@ class CreateAll(VMOps):
             self.run_thread(self.create_vm, name)
 
 
-class VMCreation(Subscript):
+class VMCreation(SubCommand):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.add_arg('name')
@@ -119,7 +117,7 @@ class CreateOnce(VMCreation):
             self.sh(command)
 
 
-class DestroyOnce(Subscript):
+class DestroyOnce(SubCommand):
     def __init__(self, superscript):
         super().__init__('destroy_once', superscript)
         self.add_arg('name')
