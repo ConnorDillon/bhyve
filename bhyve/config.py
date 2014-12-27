@@ -1,3 +1,4 @@
+import os
 from .serializable import Serializable
 from .vm import VM
 
@@ -31,6 +32,8 @@ class Config(Serializable):
 
     @classmethod
     def from_dict(cls, dct):
+        if dct is None:
+            dct = {}
         vms = {}
         for k, v in dct.items():
             v['name'] = k
@@ -39,10 +42,14 @@ class Config(Serializable):
 
     @classmethod
     def open(cls, config_file):
-        with open(config_file) as cf:
-            config = cls.load(cf.read())
-            config.file = config_file
-            return config
+        if os.path.exists(config_file):
+            with open(config_file) as cf:
+                config = cls.load(cf.read())
+        else:
+            config = cls.from_dict({})
+
+        config.file = config_file
+        return config
 
     def save(self):
         assert self.file
