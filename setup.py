@@ -2,7 +2,7 @@
 from setuptools import setup
 
 setup(name='bhyve',
-      version='0.2',
+      version='0.2.1',
       description='A tool for managing bhyve VM\'s, '
                   'because libvirt doesn\'t do want I want it to',
       url='https://github.com/ConnorDillon/bhyve',
