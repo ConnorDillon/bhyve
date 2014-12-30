@@ -1,4 +1,6 @@
 import os
+import copy
+from .utils import flatmap
 from .serializable import Serializable
 from .vm import VM
 
@@ -17,11 +19,31 @@ class Config(Serializable):
         return self
 
     def modify(self, vm):
-        self.add(vm)
-        return self
+        return self.add(vm)
 
     def get(self, vm_name):
         return self.vms[vm_name]
+
+    def clone(self, source, name):
+        vm = copy.deepcopy(self.get(source))
+
+        vm.name = name
+        vm.nmdm_id = self.new_nmdmid()
+        tapid = self.new_tapid()
+
+        for nic in vm.nics:
+            nic.name = 'tap' + str(tapid)
+            tapid += 1
+
+        cmds = []
+        for disk in vm.disks:
+            new_name = disk.name.replace(source, name)
+            for cmd in disk.clone(new_name):
+                cmds.append(cmd)
+            disk.name = new_name
+
+        self.add(vm)
+        return cmds
 
     def to_dict(self):
         dct = {}
@@ -55,3 +77,10 @@ class Config(Serializable):
         assert self.file
         with open(self.file, 'w') as cf:
             cf.write(self.dump())
+
+    def new_tapid(self):
+        max_id = max(map(lambda x: int(x.name[3:]), flatmap(lambda x: x.nics, self.vms.values())))
+        return max_id + 1
+
+    def new_nmdmid(self):
+        return max(vm.nmdm_id for vm in self.vms.values()) + 1

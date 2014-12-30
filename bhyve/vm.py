@@ -1,3 +1,4 @@
+from .utils import flatmap
 from .serializable import Serializable, load_from_key_value
 
 
@@ -100,6 +101,12 @@ class Disk(Serializable):
 
         self.zvol = '/dev/zvol/{0}/{1}'.format(self.pool, self.name)
 
+    def snapshot(self, name):
+        return 'zfs snapshot {0}/{1}@{2}'.format(self.pool, self.name, name)
+
+    def clone(self, name):
+        return [self.snapshot(name), 'zfs clone {0}/{1}@{2} {0}/{2}'.format(self.pool, self.name, name)]
+
     def create(self):
         assert self.size
         return 'zfs create -V {size} {pool}/{name}'.format(**vars(self))
@@ -116,7 +123,3 @@ class Disk(Serializable):
     @classmethod
     def from_dict(cls, dct):
         return load_from_key_value(cls, dct)
-
-
-def flatmap(fn, lst):
-    return (y for x in map(fn, lst) for y in x)

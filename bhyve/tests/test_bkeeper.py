@@ -41,6 +41,9 @@ class TestBKeeper(TestCase):
         self.create_str = self.fmt('{vm_name} {vm_nmdmid} -c {vm_cpus} -m {vm_memsize} -g {vm_bootdir} -b {vm_bootpart}'
                                    ' -n {vm_nic} {vm_bridge} -n {vm_nic2} {vm_bridge} -d {vm_vol} {vm_zpool}'
                                    ' -d {vm_vol2} {vm_zpool}')
+        self.clone_vm = 'clonevm'
+        self.clone_vol = self.vm_vol.replace(self.vm_name, self.clone_vm)
+        self.clone_vol2 = self.vm_vol2.replace(self.vm_name, self.clone_vm)
 
         self.create_expected = [
             'ifconfig {vm_nic} create',
@@ -106,6 +109,14 @@ class TestBKeeper(TestCase):
         with TestLog() as log:
             BKeeper()(self.fmt('destroy_once {vm_name} -n {vm_nic} -n {vm_nic2} --testmode --console'))
         self.verify_destroy(log)
+
+    def test_clone(self):
+        expected = [self.fmt('zfs snapshot {vm_zpool}/{vm_vol}@{clone_vol}'),
+                    self.fmt('zfs clone {vm_zpool}/{vm_vol}@{clone_vol} {vm_zpool}/{clone_vol}')]
+        with TestLog() as log:
+            BKeeper()(self.fmt('clone {vm_name} {clone_vm} --config {config} --testmode --console'))
+        for i in expected:
+            self.assertIn(i, log)
 
     def test_remove(self):
         BKeeper()(self.fmt('remove {vm_name} --config {config} --console'))

@@ -8,7 +8,7 @@ class BKeeper(SuperCommand):
     def __init__(self):
         super().__init__(name='bkeeper',
                          description='A tool for managing bhyve VM\'s',
-                         subscripts=[CreateOnce, DestroyOnce, Create, Destroy, CreateAll, Add, Remove],
+                         subscripts=[CreateOnce, DestroyOnce, Create, Destroy, CreateAll, Add, Remove, Clone],
                          log_fmt='bkeeper: %(levelname)s: %(message)s')
 
 
@@ -54,8 +54,8 @@ class VMOps(ConfigOps):
 
 
 class Create(VMOps):
-    def __init__(self, superscript):
-        super().__init__('create', superscript)
+    def __init__(self, supercmd):
+        super().__init__('create', supercmd)
         self.add_arg('name')
 
     def script(self):
@@ -63,8 +63,8 @@ class Create(VMOps):
 
 
 class Destroy(VMOps):
-    def __init__(self, superscript):
-        super().__init__('destroy', superscript)
+    def __init__(self, supercmd):
+        super().__init__('destroy', supercmd)
         self.add_arg('name')
 
     def script(self):
@@ -72,8 +72,8 @@ class Destroy(VMOps):
 
 
 class CreateAll(VMOps):
-    def __init__(self, superscript):
-        super().__init__('create_all', superscript)
+    def __init__(self, supercmd):
+        super().__init__('create_all', supercmd)
 
     def script(self):
         for name in self.load_config().vms.keys():
@@ -107,8 +107,8 @@ class VMCreation(SubCommand):
 
 
 class CreateOnce(VMCreation):
-    def __init__(self, superscript):
-        super().__init__('create_once', superscript)
+    def __init__(self, supercmd):
+        super().__init__('create_once', supercmd)
 
     def script(self):
         vm = self.get_vm()
@@ -118,8 +118,8 @@ class CreateOnce(VMCreation):
 
 
 class DestroyOnce(SubCommand):
-    def __init__(self, superscript):
-        super().__init__('destroy_once', superscript)
+    def __init__(self, supercmd):
+        super().__init__('destroy_once', supercmd)
         self.add_arg('name')
         self.add_arg('-n', '--nic', dest='nics', action=ToList)
 
@@ -131,8 +131,8 @@ class DestroyOnce(SubCommand):
 
 
 class Add(ConfigOps, VMCreation):
-    def __init__(self, superscript):
-        super().__init__('add', superscript)
+    def __init__(self, supercmd):
+        super().__init__('add', supercmd)
 
     def script(self):
         vm = self.get_vm()
@@ -142,8 +142,8 @@ class Add(ConfigOps, VMCreation):
 
 
 class Remove(VMOps):
-    def __init__(self, superscript):
-        super().__init__('remove', superscript)
+    def __init__(self, supercmd):
+        super().__init__('remove', supercmd)
         self.add_arg('name')
         self.add_arg('--erase', action='store_true')
 
@@ -156,3 +156,16 @@ class Remove(VMOps):
             vm = self.load_vm(self.args.name)
             for disk in vm.disks:
                 self.sh(disk.destroy())
+
+
+class Clone(ConfigOps):
+    def __init__(self, supercmd):
+        super().__init__('clone', supercmd)
+        self.add_arg('source')
+        self.add_arg('name')
+
+    def script(self):
+        config = self.load_config()
+        for cmd in config.clone(self.args.source, self.args.name):
+            self.sh(cmd)
+        self.save(config)
