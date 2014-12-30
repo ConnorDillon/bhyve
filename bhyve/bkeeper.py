@@ -8,7 +8,8 @@ class BKeeper(SuperCommand):
     def __init__(self):
         super().__init__(name='bkeeper',
                          description='A tool for managing bhyve VM\'s',
-                         subscripts=[CreateOnce, DestroyOnce, Create, Destroy, CreateAll, Add, Remove, Clone],
+                         subscripts=[CreateOnce, DestroyOnce, Create, Destroy, CreateAll,
+                                     Add, Remove, Clone, Snapshot],
                          log_fmt='bkeeper: %(levelname)s: %(message)s')
 
 
@@ -169,3 +170,25 @@ class Clone(ConfigOps):
         for cmd in config.clone(self.args.source, self.args.name):
             self.sh(cmd)
         self.save(config)
+
+
+class Snapshot(ConfigOps):
+    def __init__(self, supercmd):
+        super().__init__('snapshot', supercmd)
+        self.add_arg('name')
+        self.add_arg('snapshot')
+        self.add_arg('-d', '--disk')
+
+    def script(self):
+        config = self.load_config()
+        vm = config.get(self.args.name)
+        if not self.args.disk:
+            for cmd in [disk.snapshot(self.args.snapshot) for disk in vm.disks]:
+                self.sh(cmd)
+        else:
+            try:
+                disk = [d for d in vm.disks if d.name == self.args.disk][0]
+            except IndexError:
+                self.error('no disk with name: ' + self.args.disk)
+            else:
+                self.sh(disk.snapshot(self.args.snapshot))
